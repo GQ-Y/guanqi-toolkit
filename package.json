@@ -2,7 +2,7 @@
   "name": "guanqi-toolkit",
   "displayName": "观企工具箱",
   "description": "观企科技 VS Code 工具箱，提供目录结构管理、注释显示等功能，支持 uniapp 项目的页面标题显示",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -81,6 +81,21 @@
         "command": "guanqi-toolkit.paste",
         "title": "粘贴",
         "icon": "$(paste)"
+      },
+      {
+        "command": "guanqi-toolkit.generateComments",
+        "title": "生成目录注释",
+        "icon": "$(comment)"
+      },
+      {
+        "command": "guanqi-toolkit.openSettings",
+        "title": "打开设置",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "guanqi-toolkit.openGithub",
+        "title": "访问 GitHub",
+        "icon": "$(github)"
       }
     ],
     "viewsContainers": {
@@ -124,6 +139,16 @@
           "command": "guanqi-toolkit.refresh",
           "when": "view == directoryExplorer",
           "group": "navigation@3"
+        },
+        {
+          "command": "guanqi-toolkit.openSettings",
+          "when": "view == directoryExplorer",
+          "group": "navigation@4"
+        },
+        {
+          "command": "guanqi-toolkit.openGithub",
+          "when": "view == directoryExplorer",
+          "group": "navigation@5"
         }
       ],
       "view/item/context": [
@@ -186,8 +211,124 @@
           "command": "guanqi-toolkit.paste",
           "when": "view == directoryExplorer && viewItem == directory",
           "group": "5_cutcopypaste@3"
+        },
+        {
+          "command": "guanqi-toolkit.generateComments",
+          "when": "view == directoryExplorer && viewItem == directory",
+          "group": "1_modification"
         }
       ]
+    },
+    "configuration": {
+      "title": "Guanqi Toolkit",
+      "properties": {
+        "guanqi-toolkit.excludePatterns": {
+          "type": "array",
+          "default": [
+            "node_modules",
+            ".git",
+            ".DS_Store",
+            "dist",
+            "build"
+          ],
+          "description": "要排除的文件夹或文件模式"
+        },
+        "guanqi-toolkit.showHiddenFiles": {
+          "type": "boolean",
+          "default": false,
+          "description": "是否显示隐藏文件"
+        },
+        "guanqi-toolkit.sortOrder": {
+          "type": "string",
+          "enum": [
+            "default",
+            "type",
+            "name",
+            "size",
+            "date"
+          ],
+          "default": "type",
+          "description": "文件排序方式，默认按类型排序"
+        },
+        "guanqi-toolkit.showFileIcons": {
+          "type": "boolean",
+          "default": true,
+          "description": "是否显示文件图标"
+        },
+        "guanqi-toolkit.showComments": {
+          "type": "boolean",
+          "default": true,
+          "description": "是否显示文件/文件夹注释"
+        },
+        "guanqi-toolkit.autoRefresh": {
+          "type": "boolean",
+          "default": true,
+          "description": "是否自动刷新目录树"
+        },
+        "guanqi-toolkit.commentPosition": {
+          "type": "string",
+          "enum": [
+            "tooltip",
+            "inline",
+            "both"
+          ],
+          "default": "both",
+          "description": "注释显示位置"
+        },
+        "guanqi-toolkit.ai.enable": {
+          "type": "boolean",
+          "default": false,
+          "description": "是否启用 AI 注释"
+        },
+        "guanqi-toolkit.ai.provider": {
+          "type": "string",
+          "enum": ["zhipu"],
+          "default": "zhipu",
+          "description": "AI 服务提供商"
+        },
+        "guanqi-toolkit.ai.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "AI 服务 API 密钥"
+        },
+        "guanqi-toolkit.ai.showLogs": {
+          "type": "boolean",
+          "default": false,
+          "description": "是否显示 AI 调用日志"
+        },
+        "guanqi-toolkit.about": {
+          "type": "object",
+          "default": {
+            "author": "GQ-Y",
+            "email": "i1959595510@qq.com",
+            "github": "https://github.com/GQ-Y",
+            "description": "如有问题或建议，欢迎通过 GitHub 反馈"
+          },
+          "markdownDescription": "### 关于作者\n\n**作者:** GQ-Y\n\n**邮箱:** i1959595510@qq.com\n\n**GitHub:** [GQ-Y](https://github.com/GQ-Y)\n\n如有问题或建议，欢迎通过 GitHub 反馈",
+          "properties": {
+            "author": {
+              "type": "string",
+              "description": "作者",
+              "readOnly": true
+            },
+            "email": {
+              "type": "string",
+              "description": "邮箱",
+              "readOnly": true
+            },
+            "github": {
+              "type": "string",
+              "description": "GitHub",
+              "readOnly": true
+            },
+            "description": {
+              "type": "string",
+              "description": "说明",
+              "readOnly": true
+            }
+          }
+        }
+      }
     }
   },
   "scripts": {
@@ -217,5 +358,14 @@
     "annotation",
     "uniapp",
     "file-explorer"
-  ]
+  ],
+  "author": {
+    "name": "GQ-Y",
+    "email": "i1959595510@qq.com",
+    "url": "https://github.com/GQ-Y"
+  },
+  "bugs": {
+    "url": "https://github.com/GQ-Y/guanqi-toolkit/issues",
+    "email": "i1959595510@qq.com"
+  }
 }

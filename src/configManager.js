@@ -81,8 +81,14 @@ function saveConfig(rootPath, config) {
 
 // 更新目录注释
 async function updateDirectoryComment(rootPath, directoryPath, comment) {
+    console.log('正在更新目录注释:', {
+        目录路径: directoryPath,
+        注释内容: comment
+    });
+    
     const config = readConfig(rootPath);
     if (!config) {
+        console.log('未找到配置文件');
         return false;
     }
 
@@ -90,6 +96,7 @@ async function updateDirectoryComment(rootPath, directoryPath, comment) {
         for (const dir of directories) {
             if (dir.path === directoryPath) {
                 dir.comment = comment;
+                console.log('已找到并更新目录:', dir);
                 return true;
             }
             if (dir.children && dir.children.length > 0) {
@@ -101,7 +108,10 @@ async function updateDirectoryComment(rootPath, directoryPath, comment) {
         return false;
     }
 
-    if (updateComment(config.directories)) {
+    const updated = updateComment(config.directories);
+    console.log('更新结果:', updated ? '成功' : '失败');
+    
+    if (updated) {
         return saveConfig(rootPath, config);
     }
     return false;

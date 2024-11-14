@@ -3,6 +3,7 @@ const vscode = require('vscode');
 const fs = require('fs');
 const path = require('path');
 const { readUniappPages } = require('./fileUtils');
+const Config = require('./config');
 
 class DirectoryTreeProvider {
     constructor(workspaceRoot) {
@@ -16,44 +17,77 @@ class DirectoryTreeProvider {
         this.creatingType = null;
         this.inputItem = null;
         this.isRefreshing = false;
+        this.refreshTimeout = null;
+        this.lastRefreshTime = 0;
         
         // 检测是否是 Cursor
         this.isCursorEditor = vscode.env.appName.includes('Cursor');
-        console.log('Is Cursor Editor:', this.isCursorEditor);
+        
+        // 设置文件系统监听器
+        this._setupFileWatcher();
     }
 
-    async refresh() {
+    _setupFileWatcher() {
+        // 创建文件系统监听器
+        const fileWatcher = vscode.workspace.createFileSystemWatcher(
+            new vscode.RelativePattern(this.workspaceRoot, '**/*')
+        );
+
+        // 监听文件变化
+        fileWatcher.onDidChange(uri => {
+            // 移除对 directory-config.json 的监听，因为已经在 extension.js 中处理了
+            // 这里只处理其他文件的变化
+            const fileName = path.basename(uri.fsPath);
+            if (fileName !== 'directory-config.json') {
+                this.debounceRefresh();
+            }
+        });
+    }
+
+    // 新增：防抖刷新方法
+    debounceRefresh() {
+        if (this.refreshTimeout) {
+            clearTimeout(this.refreshTimeout);
+        }
+
+        // 检查距离上次刷新的时间间隔
+        const now = Date.now();
+        if (now - this.lastRefreshTime < 1000) { // 1秒内不重复刷新
+            console.log('跳过频繁刷新');
+            return;
+        }
+
+        this.refreshTimeout = setTimeout(async () => {
+            console.log('执行延迟刷新');
+            await this.loadConfig();
+            this._onDidChangeTreeData.fire();
+            this.lastRefreshTime = Date.now();
+        }, 500);  // 500ms 的防抖延迟
+    }
+
+    // 新增：加载配置文件
+    async loadConfig() {
         if (this.isRefreshing) {
+            console.log('配置加载正在进行中，跳过');
             return;
         }
 
         this.isRefreshing = true;
-        try {
-            const timeout = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Refresh timeout')), 5000)
-            );
+        console.log('开始加载配置');
 
-            await Promise.race([
-                this._refresh(),
-                timeout
-            ]);
-        } catch (error) {
-            if (process.env.NODE_ENV === 'development') {
-                console.warn('Refresh error:', error.message);
-            }
-        } finally {
-            this.isRefreshing = false;
-        }
-    }
-
-    async _refresh() {
         try {
+            // 重新加载 uniapp 页面配置
             this.pageMap = await readUniappPages(this.workspaceRoot);
+
+            // 重新加载目录配置
             const configPath = path.join(this.workspaceRoot, 'directory-config.json');
             if (fs.existsSync(configPath)) {
                 const content = fs.readFileSync(configPath, 'utf8');
                 const config = JSON.parse(content);
+                console.log('已加载配置文件:', config);
                 
+                // 更新注释映射
+                this.commentMap.clear();
                 const updateCommentMap = (directories) => {
                     for (const dir of directories) {
                         if (dir.comment) {
@@ -68,10 +102,63 @@ class DirectoryTreeProvider {
                 if (config.directories) {
                     updateCommentMap(config.directories);
                 }
+                console.log('已更新注释映射:', this.commentMap);
             }
-            this._onDidChangeTreeData.fire();
         } catch (error) {
-            console.warn('Refresh error:', error);
+            console.error('加载配置失败:', error);
+        } finally {
+            this.isRefreshing = false;
+        }
+    }
+
+    async refresh() {
+        // 如果已经在刷新中，直接返回
+        if (this.isRefreshing) {
+            console.log('刷新操作正在进行中，跳过');
+            return;
+        }
+
+        // 检查刷新间隔
+        const now = Date.now();
+        if (now - this.lastRefreshTime < 1000) {
+            console.log('跳过短时间内的重复刷新');
+            return;
+        }
+
+        this.isRefreshing = true;
+        console.log('开始刷新目录树');
+
+        try {
+            await this.loadConfig();
+            this._onDidChangeTreeData.fire();
+            this.lastRefreshTime = now;
+        } catch (error) {
+            console.error('刷新过程中发生错误:', error);
+        } finally {
+            this.isRefreshing = false;
+        }
+    }
+
+    // 强制刷新方法
+    async forceRefresh() {
+        console.log('开始强制刷新目录树');
+        if (this.refreshTimeout) {
+            clearTimeout(this.refreshTimeout);
+        }
+
+        try {
+            // 清除缓存
+            this.commentMap.clear();
+            this.pageMap = null;
+
+            // 立即执行刷新
+            await this.loadConfig();
+            this._onDidChangeTreeData.fire();
+            this.lastRefreshTime = Date.now();
+            
+            console.log('强制刷新完成');
+        } catch (error) {
+            console.error('强制刷新过程中发生错误:', error);
         }
     }
 
@@ -147,9 +234,12 @@ class DirectoryTreeProvider {
         const children = [];
 
         for (const item of items) {
-            if (item === 'node_modules' || 
-                item === '.git' || 
-                item === '.DS_Store') {
+            // 根据配置过滤文件
+            if (!Config.showHiddenFiles && item.startsWith('.')) {
+                continue;
+            }
+
+            if (Config.excludePatterns.includes(item)) {
                 continue;
             }
 
@@ -162,14 +252,50 @@ class DirectoryTreeProvider {
             }
         }
 
-        return children.sort((a, b) => {
-            const aIsDir = a.collapsibleState === vscode.TreeItemCollapsibleState.Collapsed;
-            const bIsDir = b.collapsibleState === vscode.TreeItemCollapsibleState.Collapsed;
-            if (aIsDir !== bIsDir) {
-                return aIsDir ? -1 : 1;
-            }
-            return a.label.localeCompare(b.label);
-        });
+        // 根据配置排序
+        return this._sortItems(children);
+    }
+
+    _sortItems(items) {
+        const config = vscode.workspace.getConfiguration('guanqi-toolkit');
+        const sortOrder = config.get('sortOrder');
+
+        switch (sortOrder) {
+            case 'type':
+                return items.sort((a, b) => {
+                    // 首先按目录/文件类型排序
+                    const aIsDir = a.collapsibleState === vscode.TreeItemCollapsibleState.Collapsed 
+                        || a.collapsibleState === vscode.TreeItemCollapsibleState.Expanded;
+                    const bIsDir = b.collapsibleState === vscode.TreeItemCollapsibleState.Collapsed 
+                        || b.collapsibleState === vscode.TreeItemCollapsibleState.Expanded;
+                    
+                    if (aIsDir !== bIsDir) {
+                        return aIsDir ? -1 : 1;  // 目录排在前面
+                    }
+                    
+                    // 如果都是文件，按扩展名排序
+                    if (!aIsDir && !bIsDir) {
+                        const aExt = path.extname(a.label || '').toLowerCase();
+                        const bExt = path.extname(b.label || '').toLowerCase();
+                        if (aExt !== bExt) {
+                            return aExt.localeCompare(bExt);
+                        }
+                    }
+                    
+                    // 最后按名称排序
+                    return a.label.localeCompare(b.label);
+                });
+            case 'name':
+                return items.sort((a, b) => a.label.localeCompare(b.label));
+            case 'size':
+                // 实现按大小排序的逻辑
+                return items;
+            case 'date':
+                // 实现按日期排序的逻辑
+                return items;
+            default:
+                return items;
+        }
     }
 
     async _createTreeItem(fullPath, name, stats) {
@@ -209,43 +335,29 @@ class DirectoryTreeProvider {
 
             treeItem.label = name;
 
-            if (stats.isDirectory()) {
-                treeItem.iconPath = new vscode.ThemeIcon('folder');
-            } else {
-                treeItem.iconPath = this._getFileIcon(name);
+            // 根据配置设置图标
+            if (Config.showFileIcons) {
+                if (stats.isDirectory()) {
+                    treeItem.iconPath = new vscode.ThemeIcon('folder');
+                } else {
+                    treeItem.iconPath = this._getFileIcon(name);
+                }
             }
 
-            if (comment) {
-                if (this.isCursorEditor) {
-                    treeItem.description = '';
-                } else {
-                    treeItem.description = comment;
+            // 根据配置设置注释
+            if (Config.showComments && comment) {
+                switch (Config.commentPosition) {
+                    case 'tooltip':
+                        treeItem.tooltip = comment;
+                        break;
+                    case 'inline':
+                        treeItem.description = comment;
+                        break;
+                    case 'both':
+                        treeItem.description = comment;
+                        treeItem.tooltip = this._createTooltip(relativePath, comment, stats.isDirectory());
+                        break;
                 }
-
-                const tooltipContent = new vscode.MarkdownString();
-                tooltipContent.appendMarkdown(`
-<div style="
-    padding: 10px;
-    border-radius: 6px;
-    background-color: var(--vscode-editor-background);
-    border: 1px solid var(--vscode-widget-border);
-    box-shadow: 0 2px 8px var(--vscode-widget-shadow);
-    min-width: 300px;
-">
-
-### ${stats.isDirectory() ? '目录说明' : '文件说明'}
-
----
-
-**路径：** \`${relativePath}\`
-
-**说明：** ${comment}
-
-</div>
-`);
-                tooltipContent.supportHtml = true;
-                tooltipContent.isTrusted = true;
-                treeItem.tooltip = tooltipContent;
             }
 
             if (!stats.isDirectory()) {
@@ -393,6 +505,33 @@ class DirectoryTreeProvider {
         this.creatingType = null;
         this.inputItem = null;
         this._onDidChangeTreeData.fire();
+    }
+
+    _createTooltip(relativePath, comment, isDirectory) {
+        const tooltipContent = new vscode.MarkdownString();
+        tooltipContent.appendMarkdown(`
+<div style="
+    padding: 10px;
+    border-radius: 6px;
+    background-color: var(--vscode-editor-background);
+    border: 1px solid var(--vscode-widget-border);
+    box-shadow: 0 2px 8px var(--vscode-widget-shadow);
+    min-width: 300px;
+">
+
+### ${isDirectory ? '目录说明' : '文件说明'}
+
+---
+
+**路径：** \`${relativePath}\`
+
+**说明：** ${comment}
+
+</div>
+`);
+        tooltipContent.supportHtml = true;
+        tooltipContent.isTrusted = true;
+        return tooltipContent;
     }
 }
 

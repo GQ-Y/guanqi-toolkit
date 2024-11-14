@@ -5,6 +5,7 @@ const { initializeOrUpdateConfig } = require('./src/configManager');
 const { registerCommands } = require('./src/commands');
 const path = require('path');
 const fs = require('fs');
+const Config = require('./src/config');
 
 async function activate(context) {
     try {
@@ -48,18 +49,43 @@ async function activate(context) {
             new vscode.RelativePattern(rootPath, '**/*')
         );
 
+        // 添加防抖控制
+        let refreshTimeout = null;
+        let lastRefreshTime = 0;
+        const REFRESH_INTERVAL = 1000; // 1秒的刷新间隔
+
+        const debounceRefresh = async () => {
+            if (refreshTimeout) {
+                clearTimeout(refreshTimeout);
+            }
+
+            // 检查是否需要跳过刷新
+            const now = Date.now();
+            if (now - lastRefreshTime < REFRESH_INTERVAL) {
+                console.log('跳过短时间内的重复刷新');
+                return;
+            }
+
+            refreshTimeout = setTimeout(async () => {
+                await initializeOrUpdateConfig(rootPath, treeDataProvider);
+                lastRefreshTime = Date.now();
+                refreshTimeout = null;
+            }, 500);
+        };
+
         // 监听文件变化
         fileWatcher.onDidChange(async uri => {
             const fileName = path.basename(uri.fsPath);
             if (['package.json', 'pubspec.yaml', 'pom.xml', 'build.gradle'].includes(fileName)) {
                 updateProjectType();
             }
-            if (['pages.json', 'directory-config.json'].includes(fileName)) {
-                console.log('Configuration file changed, refreshing tree view...');
+            if (fileName === 'directory-config.json') {
+                // 避免重复刷新
+                if (!refreshTimeout) {
+                    console.log('配置文件变更，准备刷新');
+                    await debounceRefresh();
+                }
             }
-            // 更新目录配置
-            await initializeOrUpdateConfig(rootPath, treeDataProvider);
-            treeDataProvider.refresh();
         });
 
         fileWatcher.onDidCreate(async uri => {
@@ -67,9 +93,6 @@ async function activate(context) {
             if (['package.json', 'pubspec.yaml', 'pom.xml', 'build.gradle'].includes(fileName)) {
                 updateProjectType();
             }
-            // 更新目录配置
-            await initializeOrUpdateConfig(rootPath, treeDataProvider);
-            treeDataProvider.refresh();
         });
 
         fileWatcher.onDidDelete(async uri => {
@@ -77,9 +100,6 @@ async function activate(context) {
             if (['package.json', 'pubspec.yaml', 'pom.xml', 'build.gradle'].includes(fileName)) {
                 updateProjectType();
             }
-            // 更新目录配置
-            await initializeOrUpdateConfig(rootPath, treeDataProvider);
-            treeDataProvider.refresh();
         });
 
         // 注册命令和事件监听
@@ -114,6 +134,11 @@ async function activate(context) {
 
         // 将监听器、状态栏和树视图添加到订阅列表
         context.subscriptions.push(fileWatcher, statusBarItem, treeView);
+
+        // 监听配置变化
+        Config.onConfigChange(context, () => {
+            treeDataProvider.refresh();
+        });
 
     } catch (error) {
         console.error('Activation error:', error);
