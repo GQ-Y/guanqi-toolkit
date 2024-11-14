@@ -1,0 +1,240 @@
+{
+  "name": "guanqi-toolkit",
+  "displayName": "观企工具箱",
+  "description": "观企科技 VS Code 工具箱，提供目录结构管理、注释显示等功能，支持 uniapp 项目的页面标题显示",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "catalog-annotations.initConfig",
+        "title": "%catalog-annotations.initConfig.title%"
+      },
+      {
+        "command": "catalog-annotations.refresh",
+        "title": "刷新",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "catalog-annotations.newFile",
+        "title": "新建文件",
+        "icon": "$(new-file)"
+      },
+      {
+        "command": "catalog-annotations.newFolder",
+        "title": "新建文件夹",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "catalog-annotations.collapseAll",
+        "title": "全部折叠",
+        "icon": "$(collapse-all)"
+      },
+      {
+        "command": "catalog-annotations.revealInFinder",
+        "title": "在 Finder 中显示",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "catalog-annotations.openInIntegratedTerminal",
+        "title": "在集成终端中打开",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "catalog-annotations.findInFolder",
+        "title": "在文件夹中查找...",
+        "icon": "$(search)"
+      },
+      {
+        "command": "catalog-annotations.copyPath",
+        "title": "复制路径"
+      },
+      {
+        "command": "catalog-annotations.copyRelativePath",
+        "title": "复制相对路径"
+      },
+      {
+        "command": "catalog-annotations.rename",
+        "title": "重命名...",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "catalog-annotations.delete",
+        "title": "删除",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "catalog-annotations.cut",
+        "title": "剪切",
+        "icon": "$(cut)"
+      },
+      {
+        "command": "catalog-annotations.copy",
+        "title": "复制",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "catalog-annotations.paste",
+        "title": "粘贴",
+        "icon": "$(paste)"
+      },
+      {
+        "command": "catalog-annotations.projectHeader.newFile",
+        "title": "新建文件",
+        "icon": "$(new-file)"
+      },
+      {
+        "command": "catalog-annotations.projectHeader.newFolder",
+        "title": "新建文件夹",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "catalog-annotations.projectHeader.refresh",
+        "title": "刷新",
+        "icon": "$(refresh)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "catalog-explorer",
+          "title": "观企工具箱",
+          "icon": "$(file-directory)"
+        }
+      ]
+    },
+    "views": {
+      "catalog-explorer": [
+        {
+          "id": "directoryExplorer",
+          "name": "",
+          "type": "tree",
+          "visibility": "visible"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "directoryExplorer",
+        "contents": "没有找到目录配置文件。\n[初始化配置](command:catalog-annotations.initConfig)"
+      }
+    ],
+    "menus": {
+      "view/title": [],
+      "view/item/context": [
+        {
+          "command": "catalog-annotations.projectHeader.newFile",
+          "when": "view == directoryExplorer && viewItem == project-header",
+          "group": "inline"
+        },
+        {
+          "command": "catalog-annotations.projectHeader.newFolder",
+          "when": "view == directoryExplorer && viewItem == project-header",
+          "group": "inline"
+        },
+        {
+          "command": "catalog-annotations.projectHeader.refresh",
+          "when": "view == directoryExplorer && viewItem == project-header",
+          "group": "inline"
+        },
+        {
+          "command": "catalog-annotations.newFile",
+          "when": "view == directoryExplorer && viewItem == directory",
+          "group": "1_modification"
+        },
+        {
+          "command": "catalog-annotations.newFolder",
+          "when": "view == directoryExplorer && viewItem == directory",
+          "group": "1_modification"
+        },
+        {
+          "command": "catalog-annotations.rename",
+          "when": "view == directoryExplorer",
+          "group": "2_modification"
+        },
+        {
+          "command": "catalog-annotations.delete",
+          "when": "view == directoryExplorer",
+          "group": "2_modification"
+        },
+        {
+          "command": "catalog-annotations.findInFolder",
+          "when": "view == directoryExplorer && viewItem == directory",
+          "group": "3_search"
+        },
+        {
+          "command": "catalog-annotations.revealInFinder",
+          "when": "view == directoryExplorer",
+          "group": "4_navigation"
+        },
+        {
+          "command": "catalog-annotations.openInIntegratedTerminal",
+          "when": "view == directoryExplorer && viewItem == directory",
+          "group": "4_navigation"
+        },
+        {
+          "command": "catalog-annotations.copyPath",
+          "when": "view == directoryExplorer",
+          "group": "5_cutcopypaste"
+        },
+        {
+          "command": "catalog-annotations.copyRelativePath",
+          "when": "view == directoryExplorer",
+          "group": "5_cutcopypaste"
+        },
+        {
+          "command": "catalog-annotations.cut",
+          "when": "view == directoryExplorer",
+          "group": "5_cutcopypaste@1"
+        },
+        {
+          "command": "catalog-annotations.copy",
+          "when": "view == directoryExplorer",
+          "group": "5_cutcopypaste@2"
+        },
+        {
+          "command": "catalog-annotations.paste",
+          "when": "view == directoryExplorer && viewItem == directory",
+          "group": "5_cutcopypaste@3"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "pretest": "npm run lint",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.95.0",
+    "@types/mocha": "^10.0.9",
+    "@types/node": "20.x",
+    "eslint": "^9.13.0",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.4.1"
+  },
+  "publisher": "GQ",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GQ-Y/guanqi-toolkit.git"
+  },
+  "icon": "images/icon.png",
+  "license": "MIT",
+  "keywords": [
+    "guanqi",
+    "toolkit",
+    "directory",
+    "annotation",
+    "uniapp",
+    "file-explorer"
+  ]
+}
