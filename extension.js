@@ -245,89 +245,86 @@ class DirectoryTreeProvider {
     }
 
     async _createTreeItem(fullPath, name, stats) {
-        const relativePath = path.relative(this.workspaceRoot, fullPath);
-        
-        // 获取注释内容
-        let comment = '';
-        if (this.commentMap && this.commentMap.has(relativePath)) {
-            comment = this.commentMap.get(relativePath);
-        } else if (this.pageMap) {
-            const pathWithoutExt = relativePath.replace(/\.vue$/, '');
-            for (const [pagePath, title] of this.pageMap.entries()) {
-                if (pathWithoutExt.includes(pagePath)) {
-                    comment = title;
-                    break;
+        try {
+            // 首先验证参数
+            if (!fullPath || !name || !stats) {
+                console.warn('Invalid parameters for _createTreeItem:', { fullPath, name, stats });
+                return null;
+            }
+
+            // 创建并验证 URI
+            const uri = vscode.Uri.file(fullPath);
+            if (!uri || !uri.scheme) {
+                console.warn('Failed to create valid URI for:', fullPath);
+                return null;
+            }
+
+            const relativePath = path.relative(this.workspaceRoot, fullPath);
+            
+            // 获取注释内容
+            let comment = '';
+            if (this.commentMap && this.commentMap.has(relativePath)) {
+                comment = this.commentMap.get(relativePath);
+            } else if (this.pageMap) {
+                const pathWithoutExt = relativePath.replace(/\.vue$/, '');
+                for (const [pagePath, title] of this.pageMap.entries()) {
+                    if (pathWithoutExt.includes(pagePath)) {
+                        comment = title;
+                        break;
+                    }
                 }
             }
-        }
 
-        // 创建基本的 TreeItem
-        const treeItem = new vscode.TreeItem(
-            name,
-            stats.isDirectory() 
-                ? vscode.TreeItemCollapsibleState.Collapsed 
-                : vscode.TreeItemCollapsibleState.None
-        );
+            // 使用验证过的 URI 创建 TreeItem
+            const treeItem = new vscode.TreeItem(
+                uri,  // 直接使用 URI 作为第一个参数
+                stats.isDirectory() 
+                    ? vscode.TreeItemCollapsibleState.Collapsed 
+                    : vscode.TreeItemCollapsibleState.None
+            );
 
-        // 设置图标
-        if (stats.isDirectory()) {
-            treeItem.iconPath = new vscode.ThemeIcon('folder');
-        } else {
-            treeItem.iconPath = this._getFileIcon(name);
-        }
+            // 设置显示名称
+            treeItem.label = name;
 
-        // 为所有环境设置统一的提示框
-        if (comment) {
-            // 在 Cursor 中只显示 tooltip
-            if (this.isCursorEditor) {
-                treeItem.description = '';
+            // 设置图标
+            if (stats.isDirectory()) {
+                treeItem.iconPath = new vscode.ThemeIcon('folder');
             } else {
-                // 在 VS Code 中同时显示 description 和 tooltip
-                treeItem.description = comment;
+                treeItem.iconPath = this._getFileIcon(name);
             }
 
-            // 创建美化的 tooltip
-            const tooltipContent = new vscode.MarkdownString();
-            tooltipContent.appendMarkdown(`
-<div style="
-    padding: 10px;
-    border-radius: 6px;
-    background-color: var(--vscode-editor-background);
-    border: 1px solid var(--vscode-widget-border);
-    box-shadow: 0 2px 8px var(--vscode-widget-shadow);
-    min-width: 300px;
-">
+            // 设置注释和提示
+            if (comment) {
+                if (this.isCursorEditor) {
+                    treeItem.description = '';
+                } else {
+                    treeItem.description = comment;
+                }
+                treeItem.tooltip = comment;
+            }
 
-### ${stats.isDirectory() ? '目录说明' : '文件说明'}
+            // 为文件设置打开命令
+            if (!stats.isDirectory()) {
+                treeItem.command = {
+                    command: 'vscode.open',
+                    title: 'Open File',
+                    arguments: [uri]  // 使用验证过的 URI
+                };
+            }
 
----
+            // 设置上下文值
+            treeItem.contextValue = stats.isDirectory() ? 'directory' : 'file';
 
-**路径：** \`${relativePath}\`
-
-**说明：** ${comment}
-
-</div>
-`);
-            tooltipContent.supportHtml = true;
-            tooltipContent.isTrusted = true;
-            treeItem.tooltip = tooltipContent;
+            return treeItem;
+        } catch (error) {
+            console.error('Error creating tree item:', {
+                error: error.message,
+                fullPath,
+                name,
+                stats: stats ? 'exists' : 'null'
+            });
+            return null;
         }
-
-        // 为文件设置命令（点击打开）
-        if (!stats.isDirectory()) {
-            treeItem.command = {
-                command: 'vscode.open',
-                title: 'Open File',
-                arguments: [treeItem.resourceUri]
-            };
-        }
-
-        // 设置上下文值
-        treeItem.contextValue = stats.isDirectory() ? 'directory' : 'file';
-
-        treeItem.resourceUri = vscode.Uri.file(fullPath);
-
-        return treeItem;
     }
 
     _getFileIcon(filename) {
@@ -553,7 +550,7 @@ async function activate(context) {
             }
         });
 
-        // 修改新建文件夹命令
+        // 修改新建文件��命令
         let newFolderCommand = vscode.commands.registerCommand('guanqi-toolkit.newFolder', async (node) => {
             const parentPath = node ? node.resourceUri.fsPath : rootPath;
             const folderName = await vscode.window.showInputBox({
