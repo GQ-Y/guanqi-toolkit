@@ -2,7 +2,7 @@
   "name": "guanqi-toolkit",
   "displayName": "观企工具箱",
   "description": "观企科技 VS Code 工具箱，提供目录结构管理、注释显示等功能，支持 uniapp 项目的页面标题显示",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -300,11 +300,11 @@
           "type": "object",
           "default": {
             "author": "GQ-Y",
-            "email": "i1959595510@qq.com",
+            "email": "1959595510@qq.com",
             "github": "https://github.com/GQ-Y",
             "description": "如有问题或建议，欢迎通过 GitHub 反馈"
           },
-          "markdownDescription": "### 关于作者\n\n**作者:** GQ-Y\n\n**邮箱:** i1959595510@qq.com\n\n**GitHub:** [GQ-Y](https://github.com/GQ-Y)\n\n如有问题或建议，欢迎通过 GitHub 反馈",
+          "markdownDescription": "### 关于作者\n\n**作者:** GQ-Y\n\n**邮箱:** 1959595510@qq.com\n\n**GitHub:** [GQ-Y](https://github.com/GQ-Y)\n\n如有问题或建议，欢迎通过 GitHub 反馈",
           "properties": {
             "author": {
               "type": "string",
@@ -361,11 +361,11 @@
   ],
   "author": {
     "name": "GQ-Y",
-    "email": "i1959595510@qq.com",
+    "email": "1959595510@qq.com",
     "url": "https://github.com/GQ-Y"
   },
   "bugs": {
     "url": "https://github.com/GQ-Y/guanqi-toolkit/issues",
-    "email": "i1959595510@qq.com"
+    "email": "1959595510@qq.com"
   }
 }
