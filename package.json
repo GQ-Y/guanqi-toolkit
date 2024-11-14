@@ -81,21 +81,6 @@
         "command": "guanqi-toolkit.paste",
         "title": "粘贴",
         "icon": "$(paste)"
-      },
-      {
-        "command": "guanqi-toolkit.projectHeader.newFile",
-        "title": "新建文件",
-        "icon": "$(new-file)"
-      },
-      {
-        "command": "guanqi-toolkit.projectHeader.newFolder",
-        "title": "新建文件夹",
-        "icon": "$(new-folder)"
-      },
-      {
-        "command": "guanqi-toolkit.projectHeader.refresh",
-        "title": "刷新",
-        "icon": "$(refresh)"
       }
     ],
     "viewsContainers": {
@@ -124,23 +109,24 @@
       }
     ],
     "menus": {
-      "view/title": [],
+      "view/title": [
+        {
+          "command": "guanqi-toolkit.newFile",
+          "when": "view == directoryExplorer",
+          "group": "navigation@1"
+        },
+        {
+          "command": "guanqi-toolkit.newFolder",
+          "when": "view == directoryExplorer",
+          "group": "navigation@2"
+        },
+        {
+          "command": "guanqi-toolkit.refresh",
+          "when": "view == directoryExplorer",
+          "group": "navigation@3"
+        }
+      ],
       "view/item/context": [
-        {
-          "command": "guanqi-toolkit.projectHeader.newFile",
-          "when": "view == directoryExplorer && viewItem == project-header",
-          "group": "inline"
-        },
-        {
-          "command": "guanqi-toolkit.projectHeader.newFolder",
-          "when": "view == directoryExplorer && viewItem == project-header",
-          "group": "inline"
-        },
-        {
-          "command": "guanqi-toolkit.projectHeader.refresh",
-          "when": "view == directoryExplorer && viewItem == project-header",
-          "group": "inline"
-        },
         {
           "command": "guanqi-toolkit.newFile",
           "when": "view == directoryExplorer && viewItem == directory",

@@ -66,10 +66,9 @@ async function readUniappPages(rootPath) {
 }
 
 // 添加版本检测函数
-function isLowerVersion(version, targetVersion) {
-    const [major1, minor1] = version.split('.').map(Number);
-    const [major2, minor2] = targetVersion.split('.').map(Number);
-    return major1 < major2 || (major1 === major2 && minor1 < minor2);
+function isCursor() {
+    // 检查是否是 Cursor 环境
+    return vscode.env.appName.includes('Cursor');
 }
 
 class DirectoryTreeProvider {
@@ -85,8 +84,9 @@ class DirectoryTreeProvider {
         this.inputItem = null;
         this.isRefreshing = false;  // 添加刷新状态标记
         
-        // 检测 VS Code/Cursor 版本
-        this.isLowerVersion = isLowerVersion(vscode.version, '1.85.0');
+        // 检测是否是 Cursor
+        this.isCursorEditor = isCursor();
+        console.log('Is Cursor Editor:', this.isCursorEditor);
     }
 
     async refresh() {
@@ -188,7 +188,7 @@ class DirectoryTreeProvider {
                     this.creatingType === 'file' ? 'new-file' : 'new-folder'
                 );
                 inputItem.command = {
-                    command: 'catalog-annotations.handleNewInput',
+                    command: 'guanqi-toolkit.handleNewInput',
                     title: 'Input Name',
                     arguments: [currentPath, this.creatingType]
                 };
@@ -214,7 +214,10 @@ class DirectoryTreeProvider {
         const children = [];
 
         for (const item of items) {
-            if (item === 'node_modules' || item === '.git') {
+            // 添加 .DS_Store 到过滤列表
+            if (item === 'node_modules' || 
+                item === '.git' || 
+                item === '.DS_Store') {  // 添加这一项
                 continue;
             }
 
@@ -258,37 +261,56 @@ class DirectoryTreeProvider {
             }
         }
 
-        let treeItem;
-        
-        if (this.isLowerVersion) {
-            // 低版本处理：将注释直接添加到标签中
-            const label = comment ? `${name} [${comment}]` : name;
-            treeItem = new vscode.TreeItem(
-                label,
-                stats.isDirectory() 
-                    ? vscode.TreeItemCollapsibleState.Collapsed 
-                    : vscode.TreeItemCollapsibleState.None
-            );
-        } else {
-            // 高版本处理：使用 description 属性
-            treeItem = new vscode.TreeItem(
-                name,
-                stats.isDirectory() 
-                    ? vscode.TreeItemCollapsibleState.Collapsed 
-                    : vscode.TreeItemCollapsibleState.None
-            );
-            if (comment) {
-                treeItem.description = comment;
-            }
-        }
+        // 创建基本的 TreeItem
+        const treeItem = new vscode.TreeItem(
+            name,
+            stats.isDirectory() 
+                ? vscode.TreeItemCollapsibleState.Collapsed 
+                : vscode.TreeItemCollapsibleState.None
+        );
 
-        treeItem.resourceUri = vscode.Uri.file(fullPath);
-        
         // 设置图标
         if (stats.isDirectory()) {
             treeItem.iconPath = new vscode.ThemeIcon('folder');
         } else {
             treeItem.iconPath = this._getFileIcon(name);
+        }
+
+        // 为所有环境设置统一的提示框
+        if (comment) {
+            // 在 Cursor 中只显示 tooltip
+            if (this.isCursorEditor) {
+                treeItem.description = '';
+            } else {
+                // 在 VS Code 中同时显示 description 和 tooltip
+                treeItem.description = comment;
+            }
+
+            // 创建美化的 tooltip
+            const tooltipContent = new vscode.MarkdownString();
+            tooltipContent.appendMarkdown(`
+<div style="
+    padding: 10px;
+    border-radius: 6px;
+    background-color: var(--vscode-editor-background);
+    border: 1px solid var(--vscode-widget-border);
+    box-shadow: 0 2px 8px var(--vscode-widget-shadow);
+    min-width: 300px;
+">
+
+### ${stats.isDirectory() ? '目录说明' : '文件说明'}
+
+---
+
+**路径：** \`${relativePath}\`
+
+**说明：** ${comment}
+
+</div>
+`);
+            tooltipContent.supportHtml = true;
+            tooltipContent.isTrusted = true;
+            treeItem.tooltip = tooltipContent;
         }
 
         // 为文件设置命令（点击打开）
@@ -303,10 +325,7 @@ class DirectoryTreeProvider {
         // 设置上下文值
         treeItem.contextValue = stats.isDirectory() ? 'directory' : 'file';
 
-        // 添加工具提示，显示完整注释
-        if (comment) {
-            treeItem.tooltip = `${name}\n${comment}`;
-        }
+        treeItem.resourceUri = vscode.Uri.file(fullPath);
 
         return treeItem;
     }
@@ -511,7 +530,7 @@ async function activate(context) {
         });
 
         // 修改新建文件命令
-        let newFileCommand = vscode.commands.registerCommand('catalog-annotations.newFile', async (node) => {
+        let newFileCommand = vscode.commands.registerCommand('guanqi-toolkit.newFile', async (node) => {
             const dirPath = node ? node.resourceUri.fsPath : rootPath;
             const fileName = await vscode.window.showInputBox({
                 prompt: '输入文件名',
@@ -535,7 +554,7 @@ async function activate(context) {
         });
 
         // 修改新建文件夹命令
-        let newFolderCommand = vscode.commands.registerCommand('catalog-annotations.newFolder', async (node) => {
+        let newFolderCommand = vscode.commands.registerCommand('guanqi-toolkit.newFolder', async (node) => {
             const parentPath = node ? node.resourceUri.fsPath : rootPath;
             const folderName = await vscode.window.showInputBox({
                 prompt: '输入文件夹名',
@@ -558,14 +577,14 @@ async function activate(context) {
         });
 
         // 在 Finder 中显示
-        let revealInFinderCommand = vscode.commands.registerCommand('catalog-annotations.revealInFinder', (node) => {
+        let revealInFinderCommand = vscode.commands.registerCommand('guanqi-toolkit.revealInFinder', (node) => {
             if (node && node.resourceUri) {
                 vscode.commands.executeCommand('revealFileInOS', node.resourceUri);
             }
         });
 
         // 在集成终端中打开
-        let openInTerminalCommand = vscode.commands.registerCommand('catalog-annotations.openInIntegratedTerminal', (node) => {
+        let openInTerminalCommand = vscode.commands.registerCommand('guanqi-toolkit.openInIntegratedTerminal', (node) => {
             if (node && node.resourceUri) {
                 const terminal = vscode.window.createTerminal({
                     cwd: node.resourceUri.fsPath
@@ -575,7 +594,7 @@ async function activate(context) {
         });
 
         // 在文件夹中查找
-        let findInFolderCommand = vscode.commands.registerCommand('catalog-annotations.findInFolder', async (node) => {
+        let findInFolderCommand = vscode.commands.registerCommand('guanqi-toolkit.findInFolder', async (node) => {
             if (node && node.resourceUri) {
                 await vscode.commands.executeCommand('workbench.action.findInFiles', {
                     query: '',
@@ -585,14 +604,14 @@ async function activate(context) {
         });
 
         // 复制路径
-        let copyPathCommand = vscode.commands.registerCommand('catalog-annotations.copyPath', (node) => {
+        let copyPathCommand = vscode.commands.registerCommand('guanqi-toolkit.copyPath', (node) => {
             if (node && node.resourceUri) {
                 vscode.env.clipboard.writeText(node.resourceUri.fsPath);
             }
         });
 
         // 复制相对路径
-        let copyRelativePathCommand = vscode.commands.registerCommand('catalog-annotations.copyRelativePath', (node) => {
+        let copyRelativePathCommand = vscode.commands.registerCommand('guanqi-toolkit.copyRelativePath', (node) => {
             if (node && node.resourceUri) {
                 const relativePath = path.relative(workspaceFolders[0].uri.fsPath, node.resourceUri.fsPath);
                 vscode.env.clipboard.writeText(relativePath);
@@ -600,7 +619,7 @@ async function activate(context) {
         });
 
         // 重命名
-        let renameCommand = vscode.commands.registerCommand('catalog-annotations.rename', async (node) => {
+        let renameCommand = vscode.commands.registerCommand('guanqi-toolkit.rename', async (node) => {
             if (node && node.resourceUri) {
                 const oldPath = node.resourceUri.fsPath;
                 const oldName = path.basename(oldPath);
@@ -631,7 +650,7 @@ async function activate(context) {
         });
 
         // 删除
-        let deleteCommand = vscode.commands.registerCommand('catalog-annotations.delete', async (node) => {
+        let deleteCommand = vscode.commands.registerCommand('guanqi-toolkit.delete', async (node) => {
             if (node && node.resourceUri) {
                 const isDirectory = fs.statSync(node.resourceUri.fsPath).isDirectory();
                 const confirmMessage = `确定要删除${isDirectory ? '文件夹' : '文件'} "${path.basename(node.resourceUri.fsPath)}" 吗？`;
@@ -662,7 +681,7 @@ async function activate(context) {
         let isCut = false;
 
         // 剪切命令
-        let cutCommand = vscode.commands.registerCommand('catalog-annotations.cut', (node) => {
+        let cutCommand = vscode.commands.registerCommand('guanqi-toolkit.cut', (node) => {
             if (node && node.resourceUri) {
                 clipboardItem = node.resourceUri;
                 isCut = true;
@@ -670,7 +689,7 @@ async function activate(context) {
         });
 
         // 复制命令
-        let copyCommand = vscode.commands.registerCommand('catalog-annotations.copy', (node) => {
+        let copyCommand = vscode.commands.registerCommand('guanqi-toolkit.copy', (node) => {
             if (node && node.resourceUri) {
                 clipboardItem = node.resourceUri;
                 isCut = false;
@@ -678,7 +697,7 @@ async function activate(context) {
         });
 
         // 粘贴命令
-        let pasteCommand = vscode.commands.registerCommand('catalog-annotations.paste', async (node) => {
+        let pasteCommand = vscode.commands.registerCommand('guanqi-toolkit.paste', async (node) => {
             if (!clipboardItem || !node || !node.resourceUri) {
                 return;
             }
@@ -757,23 +776,23 @@ async function activate(context) {
 
         // 注册项目名称栏的命令
         let projectHeaderNewFileCommand = vscode.commands.registerCommand(
-            'catalog-annotations.projectHeader.newFile',
-            () => vscode.commands.executeCommand('catalog-annotations.newFile')
+            'guanqi-toolkit.projectHeader.newFile',
+            () => vscode.commands.executeCommand('guanqi-toolkit.newFile')
         );
 
         let projectHeaderNewFolderCommand = vscode.commands.registerCommand(
-            'catalog-annotations.projectHeader.newFolder',
-            () => vscode.commands.executeCommand('catalog-annotations.newFolder')
+            'guanqi-toolkit.projectHeader.newFolder',
+            () => vscode.commands.executeCommand('guanqi-toolkit.newFolder')
         );
 
         let projectHeaderRefreshCommand = vscode.commands.registerCommand(
-            'catalog-annotations.projectHeader.refresh',
-            () => vscode.commands.executeCommand('catalog-annotations.refresh')
+            'guanqi-toolkit.projectHeader.refresh',
+            () => vscode.commands.executeCommand('guanqi-toolkit.refresh')
         );
 
-        // 注册处理新建输入的命令
+        // 注册理新建输入的命令
         let handleNewInputCommand = vscode.commands.registerCommand(
-            'catalog-annotations.handleNewInput',
+            'guanqi-toolkit.handleNewInput',
             async (parentPath, type) => {
                 // 创建一个内联的输入框
                 const inputBox = vscode.window.createTextEditorDecorationType({
@@ -809,7 +828,7 @@ async function activate(context) {
                                 if (e.document === document) {
                                     const text = e.document.getText().trim();
                                     if (text.includes('\n')) {
-                                        // Enter 键被按下
+                                        // Enter 键被按
                                         resolve(text.replace('\n', ''));
                                     }
                                 }
@@ -897,7 +916,7 @@ async function activate(context) {
                     directories: directoryStructure || []
                 };
 
-                // 写入配置文件
+                // 写配置文件
                 try {
                     fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
                     console.log('Config file created successfully');
@@ -1028,28 +1047,204 @@ async function activate(context) {
             }
         }
 
-        // 将新命令添加到订阅列表
-        context.subscriptions.push(
-            treeView,
-            refreshCommand,
-            newFileCommand,
-            newFolderCommand,
-            revealInFinderCommand,
-            openInTerminalCommand,
-            findInFolderCommand,
-            copyPathCommand,
-            copyRelativePathCommand,
-            renameCommand,
-            deleteCommand,
-            cutCommand,
-            copyCommand,
-            pasteCommand,
-            projectHeaderNewFileCommand,
-            projectHeaderNewFolderCommand,
-            projectHeaderRefreshCommand,
-            handleNewInputCommand,
-            initConfigCommand
-        );
+        // 注册所有命令
+        let commands = [
+            // 基本操作命令
+            vscode.commands.registerCommand('guanqi-toolkit.refresh', () => {
+                treeDataProvider.refresh();
+            }),
+
+            // 文件操作命令
+            vscode.commands.registerCommand('guanqi-toolkit.revealInFinder', (node) => {
+                if (node && node.resourceUri) {
+                    vscode.commands.executeCommand('revealFileInOS', node.resourceUri);
+                }
+            }),
+
+            vscode.commands.registerCommand('guanqi-toolkit.openInIntegratedTerminal', (node) => {
+                if (node && node.resourceUri) {
+                    const terminal = vscode.window.createTerminal({
+                        cwd: node.resourceUri.fsPath
+                    });
+                    terminal.show();
+                }
+            }),
+
+            vscode.commands.registerCommand('guanqi-toolkit.findInFolder', async (node) => {
+                if (node && node.resourceUri) {
+                    await vscode.commands.executeCommand('workbench.action.findInFiles', {
+                        query: '',
+                        filesToInclude: node.resourceUri.fsPath
+                    });
+                }
+            }),
+
+            // 剪贴板操作命令
+            vscode.commands.registerCommand('guanqi-toolkit.copyPath', (node) => {
+                if (node && node.resourceUri) {
+                    vscode.env.clipboard.writeText(node.resourceUri.fsPath);
+                }
+            }),
+
+            vscode.commands.registerCommand('guanqi-toolkit.copyRelativePath', (node) => {
+                if (node && node.resourceUri) {
+                    const relativePath = path.relative(workspaceFolders[0].uri.fsPath, node.resourceUri.fsPath);
+                    vscode.env.clipboard.writeText(relativePath);
+                }
+            }),
+
+            // 编辑操作命令
+            vscode.commands.registerCommand('guanqi-toolkit.rename', async (node) => {
+                if (node && node.resourceUri) {
+                    const oldPath = node.resourceUri.fsPath;
+                    const oldName = path.basename(oldPath);
+                    const dirPath = path.dirname(oldPath);
+
+                    const newName = await vscode.window.showInputBox({
+                        prompt: '输入新名称',
+                        value: oldName,
+                        validateInput: (value) => {
+                            if (!value) return '名称不能为空';
+                            if (value === oldName) return null;
+                            const newPath = path.join(dirPath, value);
+                            if (fs.existsSync(newPath)) return '文件/文件夹已存在';
+                            return null;
+                        }
+                    });
+
+                    if (newName && newName !== oldName) {
+                        try {
+                            const newPath = path.join(dirPath, newName);
+                            fs.renameSync(oldPath, newPath);
+                            treeDataProvider.refresh();
+                        } catch (err) {
+                            vscode.window.showErrorMessage(`重命名失败: ${err.message}`);
+                        }
+                    }
+                }
+            }),
+
+            vscode.commands.registerCommand('guanqi-toolkit.delete', async (node) => {
+                if (node && node.resourceUri) {
+                    const isDirectory = fs.statSync(node.resourceUri.fsPath).isDirectory();
+                    const confirmMessage = `确定要删除${isDirectory ? '文件夹' : '文件'} "${path.basename(node.resourceUri.fsPath)}" 吗？`;
+                    
+                    const choice = await vscode.window.showWarningMessage(
+                        confirmMessage,
+                        { modal: true },
+                        '删除'
+                    );
+
+                    if (choice === '删除') {
+                        try {
+                            if (isDirectory) {
+                                fs.rmdirSync(node.resourceUri.fsPath, { recursive: true });
+                            } else {
+                                fs.unlinkSync(node.resourceUri.fsPath);
+                            }
+                            treeDataProvider.refresh();
+                        } catch (err) {
+                            vscode.window.showErrorMessage(`删除失败: ${err.message}`);
+                        }
+                    }
+                }
+            }),
+
+            // 剪切、复制、粘贴命令
+            vscode.commands.registerCommand('guanqi-toolkit.cut', (node) => {
+                if (node && node.resourceUri) {
+                    clipboardItem = node.resourceUri;
+                    isCut = true;
+                }
+            }),
+
+            vscode.commands.registerCommand('guanqi-toolkit.copy', (node) => {
+                if (node && node.resourceUri) {
+                    clipboardItem = node.resourceUri;
+                    isCut = false;
+                }
+            }),
+
+            vscode.commands.registerCommand('guanqi-toolkit.paste', async (node) => {
+                if (!clipboardItem || !node || !node.resourceUri) {
+                    return;
+                }
+
+                const sourceUri = clipboardItem;
+                const targetDir = node.resourceUri.fsPath;
+                const sourcePath = sourceUri.fsPath;
+                const fileName = path.basename(sourcePath);
+                const targetPath = path.join(targetDir, fileName);
+
+                try {
+                    // 检查目标路径是否已
+                    if (fs.existsSync(targetPath)) {
+                        const result = await vscode.window.showWarningMessage(
+                            `${fileName} 已存在，是否替？`,
+                            { modal: true },
+                            '替换',
+                            '取消'
+                        );
+                        if (result !== '替换') {
+                            return;
+                        }
+                    }
+
+                    const isDirectory = fs.statSync(sourcePath).isDirectory();
+
+                    // 复制移动文件/目录
+                    if (isDirectory) {
+                        // 使用递归函数复制目录
+                        const copyDir = (src, dest) => {
+                            if (!fs.existsSync(dest)) {
+                                fs.mkdirSync(dest);
+                            }
+                            const entries = fs.readdirSync(src);
+                            for (const entry of entries) {
+                                const srcPath = path.join(src, entry);
+                                const destPath = path.join(dest, entry);
+                                const stat = fs.statSync(srcPath);
+                                if (stat.isDirectory()) {
+                                    copyDir(srcPath, destPath);
+                                } else {
+                                    fs.copyFileSync(srcPath, destPath);
+                                }
+                            }
+                        };
+
+                        if (isCut) {
+                            // 移动目录
+                            fs.renameSync(sourcePath, targetPath);
+                        } else {
+                            // 复制目录
+                            copyDir(sourcePath, targetPath);
+                        }
+                    } else {
+                        if (isCut) {
+                            // 移动文件
+                            fs.renameSync(sourcePath, targetPath);
+                        } else {
+                            // 复制文件
+                            fs.copyFileSync(sourcePath, targetPath);
+                        }
+                    }
+
+                    // 如果是剪切操作，清除剪贴板
+                    if (isCut) {
+                        clipboardItem = null;
+                        isCut = false;
+                    }
+
+                    // 刷新树视图
+                    treeDataProvider.refresh();
+                } catch (err) {
+                    vscode.window.showErrorMessage(`${isCut ? '移动' : '复制'}失败: ${err.message}`);
+                }
+            })
+        ];
+
+        // 将所有命令添加到订阅列表
+        context.subscriptions.push(...commands);
 
         // 监听文件系统变化
         const fileWatcher = vscode.workspace.createFileSystemWatcher('**/*');
