@@ -5,83 +5,71 @@ const path = require('path');
 // 读取 uniapp pages.json 文件
 async function readUniappPages(rootPath) {
     const pagesPath = path.join(rootPath, 'pages.json');
+    
+    // 如果文件不存在，直接返回 null，不显示错误
     if (!fs.existsSync(pagesPath)) {
         return null;
     }
 
     try {
         const content = fs.readFileSync(pagesPath, 'utf-8');
-        const pagesConfig = JSON.parse(content);
         
+        // 尝试解析 JSON
+        let pagesConfig;
+        try {
+            pagesConfig = JSON.parse(content);
+        } catch (parseError) {
+            // 只在开发模式下显示警告
+            if (process.env.NODE_ENV === 'development') {
+                console.warn('Pages.json parse error:', parseError.message);
+            }
+            return null;
+        }
+
         // 创建页面路径到标题的映射
         const pageMap = new Map();
 
         // 处理主包页面
-        if (pagesConfig.pages) {
+        if (pagesConfig.pages && Array.isArray(pagesConfig.pages)) {
             pagesConfig.pages.forEach(page => {
-                if (page.path && page.style && page.style.navigationBarTitleText) {
+                if (page && page.path && page.style && page.style.navigationBarTitleText) {
                     pageMap.set(page.path, page.style.navigationBarTitleText);
                 }
             });
         }
 
         // 处理分包页面
-        if (pagesConfig.subPackages) {
+        if (pagesConfig.subPackages && Array.isArray(pagesConfig.subPackages)) {
             pagesConfig.subPackages.forEach(subPackage => {
-                const root = subPackage.root;
-                if (subPackage.pages) {
-                    subPackage.pages.forEach(page => {
-                        if (page.path && page.style && page.style.navigationBarTitleText) {
-                            const fullPath = path.join(root, page.path);
-                            pageMap.set(fullPath, page.style.navigationBarTitleText);
-                        }
-                    });
+                if (subPackage && subPackage.root) {
+                    const root = subPackage.root;
+                    if (subPackage.pages && Array.isArray(subPackage.pages)) {
+                        subPackage.pages.forEach(page => {
+                            if (page && page.path && page.style && page.style.navigationBarTitleText) {
+                                const fullPath = path.join(root, page.path);
+                                pageMap.set(fullPath, page.style.navigationBarTitleText);
+                            }
+                        });
+                    }
                 }
             });
         }
 
         return pageMap;
     } catch (error) {
-        console.error('Error reading pages.json:', error);
+        // 只在开发模式下显示警告
+        if (process.env.NODE_ENV === 'development') {
+            console.warn('Error reading pages.json:', error.message);
+        }
         return null;
     }
 }
 
-// 读取配置文件
-async function readConfigFile(rootPath) {
-    const configPath = path.join(rootPath, 'directory-config.json');
-    if (!fs.existsSync(configPath)) {
-        return null;
-    }
-
-    try {
-        const content = fs.readFileSync(configPath, 'utf-8');
-        const config = JSON.parse(content);
-        
-        // 创建路径到注释的映射
-        const commentMap = new Map();
-
-        function processDirectories(directories, parentPath = '') {
-            directories.forEach(dir => {
-                const fullPath = dir.path;
-                if (dir.comment) {
-                    commentMap.set(fullPath, dir.comment);
-                }
-                if (dir.children) {
-                    processDirectories(dir.children, fullPath);
-                }
-            });
-        }
-
-        if (config.directories) {
-            processDirectories(config.directories);
-        }
-
-        return commentMap;
-    } catch (error) {
-        console.error('Error reading config file:', error);
-        return null;
-    }
+// 添加版本检测函数
+function isLowerVersion(version, targetVersion) {
+    const [major1, minor1] = version.split('.').map(Number);
+    const [major2, minor2] = targetVersion.split('.').map(Number);
+    return major1 < major2 || (major1 === major2 && minor1 < minor2);
 }
 
 class DirectoryTreeProvider {
@@ -90,18 +78,72 @@ class DirectoryTreeProvider {
         this._onDidChangeTreeData = new vscode.EventEmitter();
         this.onDidChangeTreeData = this._onDidChangeTreeData.event;
         this.pageMap = null;
-        this.commentMap = null;
+        this.commentMap = new Map();
         this.isCreatingNew = false;
         this.creatingParentPath = null;
         this.creatingType = null;
         this.inputItem = null;
+        this.isRefreshing = false;  // 添加刷新状态标记
+        
+        // 检测 VS Code/Cursor 版本
+        this.isLowerVersion = isLowerVersion(vscode.version, '1.85.0');
     }
 
     async refresh() {
-        // 重新读取配置
-        this.pageMap = await readUniappPages(this.workspaceRoot);
-        this.commentMap = await readConfigFile(this.workspaceRoot);
-        this._onDidChangeTreeData.fire();
+        // 防止重复刷新
+        if (this.isRefreshing) {
+            return;
+        }
+
+        this.isRefreshing = true;
+        try {
+            // 使用 Promise.race 添加超时处理
+            const timeout = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Refresh timeout')), 5000)
+            );
+
+            await Promise.race([
+                this._refresh(),
+                timeout
+            ]);
+        } catch (error) {
+            // 只在开发模式下显示警告
+            if (process.env.NODE_ENV === 'development') {
+                console.warn('Refresh error:', error.message);
+            }
+        } finally {
+            this.isRefreshing = false;
+        }
+    }
+
+    async _refresh() {
+        try {
+            this.pageMap = await readUniappPages(this.workspaceRoot);
+            const configPath = path.join(this.workspaceRoot, 'directory-config.json');
+            if (fs.existsSync(configPath)) {
+                const content = fs.readFileSync(configPath, 'utf8');
+                const config = JSON.parse(content);
+                
+                // 将配置文件中的注释转换为 Map
+                const updateCommentMap = (directories) => {
+                    for (const dir of directories) {
+                        if (dir.comment) {
+                            this.commentMap.set(dir.path, dir.comment);
+                        }
+                        if (dir.children && dir.children.length > 0) {
+                            updateCommentMap(dir.children);
+                        }
+                    }
+                };
+
+                if (config.directories) {
+                    updateCommentMap(config.directories);
+                }
+            }
+            this._onDidChangeTreeData.fire();
+        } catch (error) {
+            console.warn('Refresh error:', error);
+        }
     }
 
     getTreeItem(element) {
@@ -201,12 +243,44 @@ class DirectoryTreeProvider {
 
     async _createTreeItem(fullPath, name, stats) {
         const relativePath = path.relative(this.workspaceRoot, fullPath);
-        const treeItem = new vscode.TreeItem(
-            name,
-            stats.isDirectory() 
-                ? vscode.TreeItemCollapsibleState.Collapsed 
-                : vscode.TreeItemCollapsibleState.None
-        );
+        
+        // 获取注释内容
+        let comment = '';
+        if (this.commentMap && this.commentMap.has(relativePath)) {
+            comment = this.commentMap.get(relativePath);
+        } else if (this.pageMap) {
+            const pathWithoutExt = relativePath.replace(/\.vue$/, '');
+            for (const [pagePath, title] of this.pageMap.entries()) {
+                if (pathWithoutExt.includes(pagePath)) {
+                    comment = title;
+                    break;
+                }
+            }
+        }
+
+        let treeItem;
+        
+        if (this.isLowerVersion) {
+            // 低版本处理：将注释直接添加到标签中
+            const label = comment ? `${name} [${comment}]` : name;
+            treeItem = new vscode.TreeItem(
+                label,
+                stats.isDirectory() 
+                    ? vscode.TreeItemCollapsibleState.Collapsed 
+                    : vscode.TreeItemCollapsibleState.None
+            );
+        } else {
+            // 高版本处理：使用 description 属性
+            treeItem = new vscode.TreeItem(
+                name,
+                stats.isDirectory() 
+                    ? vscode.TreeItemCollapsibleState.Collapsed 
+                    : vscode.TreeItemCollapsibleState.None
+            );
+            if (comment) {
+                treeItem.description = comment;
+            }
+        }
 
         treeItem.resourceUri = vscode.Uri.file(fullPath);
         
@@ -229,27 +303,9 @@ class DirectoryTreeProvider {
         // 设置上下文值
         treeItem.contextValue = stats.isDirectory() ? 'directory' : 'file';
 
-        // 设置注释（优先使用配置文件中的注释）
-        let comment = '';
-        
-        // 检查配置文件中的注释
-        if (this.commentMap) {
-            comment = this.commentMap.get(relativePath) || '';
-        }
-
-        // 如果没有配置文件注释，检查 pages.json 中的标题
-        if (!comment && this.pageMap) {
-            const pathWithoutExt = relativePath.replace(/\.vue$/, '');
-            for (const [pagePath, title] of this.pageMap.entries()) {
-                if (pathWithoutExt.includes(pagePath)) {
-                    comment = title;
-                    break;
-                }
-            }
-        }
-
+        // 添加工具提示，显示完整注释
         if (comment) {
-            treeItem.description = comment;
+            treeItem.tooltip = `${name}\n${comment}`;
         }
 
         return treeItem;
@@ -406,16 +462,27 @@ class DirectoryTreeProvider {
     }
 }
 
-function activate(context) {
-    console.log('Activating extension...');
+async function activate(context) {
+    try {
+        console.log('Activating extension...');
 
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (workspaceFolders) {
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (!workspaceFolders) {
+            return;
+        }
+
         const rootPath = workspaceFolders[0].uri.fsPath;
         const treeDataProvider = new DirectoryTreeProvider(rootPath);
         
-        // 初始化配置
-        treeDataProvider.refresh();
+        // 使用 Promise.all 处理并发操作
+        await Promise.all([
+            initializeOrUpdateConfig(rootPath, treeDataProvider).catch(error => {
+                console.warn('Config initialization error:', error.message);
+            }),
+            treeDataProvider.refresh().catch(error => {
+                console.warn('Initial refresh error:', error.message);
+            })
+        ]);
 
         // 创建树视图
         const treeView = vscode.window.createTreeView('directoryExplorer', {
@@ -439,7 +506,7 @@ function activate(context) {
         });
 
         // 注册刷新命令
-        let refreshCommand = vscode.commands.registerCommand('catalog-annotations.refresh', () => {
+        let refreshCommand = vscode.commands.registerCommand('guanqi-toolkit.refresh', () => {
             treeDataProvider.refresh();
         });
 
@@ -590,7 +657,7 @@ function activate(context) {
             }
         });
 
-        // 用于存储剪切/复制的文件信息
+        // 用于存剪切/复制的文件信息
         let clipboardItem = null;
         let isCut = false;
 
@@ -623,7 +690,7 @@ function activate(context) {
             const targetPath = path.join(targetDir, fileName);
 
             try {
-                // 检查目标路径是否已存
+                // 检查目标路径是否已
                 if (fs.existsSync(targetPath)) {
                     const result = await vscode.window.showWarningMessage(
                         `${fileName} 已存在，是否替？`,
@@ -638,7 +705,7 @@ function activate(context) {
 
                 const isDirectory = fs.statSync(sourcePath).isDirectory();
 
-                // 复制或移动文件/目录
+                // 复制移动文件/目录
                 if (isDirectory) {
                     // 使用递归函数复制目录
                     const copyDir = (src, dest) => {
@@ -789,6 +856,178 @@ function activate(context) {
             }
         );
 
+        // 注册初始化配置文件命令
+        let initConfigCommand = vscode.commands.registerCommand('guanqi-toolkit.initConfig', async () => {
+            try {
+                console.log('Executing initConfig command...');
+                const workspaceFolders = vscode.workspace.workspaceFolders;
+                if (!workspaceFolders) {
+                    vscode.window.showErrorMessage('请先打开一个工作区文夹！');
+                    return;
+                }
+
+                const rootPath = workspaceFolders[0].uri.fsPath;
+                const configPath = path.join(rootPath, 'directory-config.json');
+
+                // 检查配置文件是否存在
+                if (fs.existsSync(configPath)) {
+                    const choice = await vscode.window.showWarningMessage(
+                        '配置文件已存在，是否要重新创建？',
+                        '是',
+                        '否'
+                    );
+                    if (choice !== '是') {
+                        return;
+                    }
+                }
+
+                // 扫描目录结构
+                let directoryStructure;
+                try {
+                    directoryStructure = await scanDirectory(rootPath);
+                } catch (scanError) {
+                    console.error('Error scanning directory:', scanError);
+                    vscode.window.showErrorMessage(`扫描目录失败: ${scanError.message}`);
+                    return;
+                }
+
+                // 创建配置文件
+                const config = {
+                    version: '1.0',
+                    directories: directoryStructure || []
+                };
+
+                // 写入配置文件
+                try {
+                    fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
+                    console.log('Config file created successfully');
+                    vscode.window.showInformationMessage('配置文件已创建成功！');
+                    
+                    // 延迟刷新树视图
+                    setTimeout(() => {
+                        try {
+                            treeDataProvider.refresh();
+                        } catch (refreshError) {
+                            console.warn('Error refreshing tree view:', refreshError);
+                        }
+                    }, 100);
+                } catch (writeError) {
+                    console.error('Error writing config file:', writeError);
+                    vscode.window.showErrorMessage(`创建配置文件失败: ${writeError.message}`);
+                    return;
+                }
+            } catch (error) {
+                console.error('Error in initConfig command:', error);
+                vscode.window.showErrorMessage(`初始化配置失败: ${error.message}`);
+            }
+        });
+
+        // 目录扫描函数
+        async function scanDirectory(rootPath) {
+            try {
+                async function scan(currentPath, relativePath) {
+                    const items = fs.readdirSync(currentPath);
+                    const directories = [];
+
+                    for (const item of items) {
+                        // 忽略隐藏文件和特定目录
+                        if (item.startsWith('.') || 
+                            item === 'node_modules' || 
+                            item === 'dist' || 
+                            item === 'build') {
+                            continue;
+                        }
+
+                        const fullPath = path.join(currentPath, item);
+                        const itemRelativePath = path.join(relativePath, item);
+                        
+                        try {
+                            const stats = fs.statSync(fullPath);
+                            if (stats.isDirectory()) {
+                                const children = await scan(fullPath, itemRelativePath);
+                                directories.push({
+                                    path: itemRelativePath,
+                                    comment: '',
+                                    children: children
+                                });
+                            }
+                        } catch (err) {
+                            console.warn(`Skipping ${fullPath}: ${err.message}`);
+                        }
+                    }
+
+                    return directories;
+                }
+
+                return await scan(rootPath, '');
+            } catch (error) {
+                console.error('Error scanning directory:', error);
+                return [];
+            }
+        }
+
+        // 添加目录结构合并函数
+        function mergeDirectories(existing, current) {
+            const mergedDirs = [];
+            const existingMap = new Map(existing.map(dir => [dir.path, dir]));
+
+            for (const currentDir of current) {
+                const existingDir = existingMap.get(currentDir.path);
+                if (existingDir) {
+                    // 保留现有注释
+                    mergedDirs.push({
+                        path: currentDir.path,
+                        comment: existingDir.comment || '',
+                        children: existingDir.children && currentDir.children ? 
+                            mergeDirectories(existingDir.children, currentDir.children) : 
+                            currentDir.children
+                    });
+                } else {
+                    // 添加新目录
+                    mergedDirs.push(currentDir);
+                }
+            }
+
+            return mergedDirs;
+        }
+
+        // 添加配置文件初始化或更新函数
+        async function initializeOrUpdateConfig(rootPath, treeDataProvider) {
+            const configPath = path.join(rootPath, 'directory-config.json');
+            
+            try {
+                let config;
+                if (fs.existsSync(configPath)) {
+                    // 读取现有配置
+                    const content = fs.readFileSync(configPath, 'utf8');
+                    config = JSON.parse(content);
+                    
+                    // 扫描当前目录结构
+                    const currentStructure = await scanDirectory(rootPath);
+                    
+                    // 更新配置，保留现有注释
+                    config.directories = mergeDirectories(config.directories, currentStructure);
+                } else {
+                    // 创建新配置
+                    const directoryStructure = await scanDirectory(rootPath);
+                    config = {
+                        version: '1.0',
+                        directories: directoryStructure
+                    };
+                }
+
+                // 写入配置文件
+                fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
+                console.log('Config file initialized/updated successfully');
+                
+                // 刷新树视图
+                treeDataProvider.refresh();
+            } catch (error) {
+                console.error('Error initializing/updating config:', error);
+                vscode.window.showErrorMessage(`配置文件初始化/更新失败: ${error.message}`);
+            }
+        }
+
         // 将新命令添加到订阅列表
         context.subscriptions.push(
             treeView,
@@ -808,7 +1047,8 @@ function activate(context) {
             projectHeaderNewFileCommand,
             projectHeaderNewFolderCommand,
             projectHeaderRefreshCommand,
-            handleNewInputCommand
+            handleNewInputCommand,
+            initConfigCommand
         );
 
         // 监听文件系统变化
@@ -828,6 +1068,14 @@ function activate(context) {
         });
 
         context.subscriptions.push(fileWatcher, configWatcher);
+
+        // 添加错误处理的监听器
+        process.on('unhandledRejection', (reason, promise) => {
+            console.warn('Unhandled Rejection at:', promise, 'reason:', reason);
+        });
+
+    } catch (error) {
+        console.error('Activation error:', error.message);
     }
 }
 

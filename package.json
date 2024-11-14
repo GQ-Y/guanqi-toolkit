@@ -2,9 +2,9 @@
   "name": "guanqi-toolkit",
   "displayName": "观企工具箱",
   "description": "观企科技 VS Code 工具箱，提供目录结构管理、注释显示等功能，支持 uniapp 项目的页面标题显示",
-  "version": "0.0.1",
+  "version": "0.0.4",
   "engines": {
-    "vscode": "^1.95.0"
+    "vscode": "^1.74.0"
   },
   "categories": [
     "Other"
@@ -16,89 +16,84 @@
   "contributes": {
     "commands": [
       {
-        "command": "catalog-annotations.initConfig",
-        "title": "%catalog-annotations.initConfig.title%"
+        "command": "guanqi-toolkit.initConfig",
+        "title": "%guanqi-toolkit.initConfig.title%"
       },
       {
-        "command": "catalog-annotations.refresh",
+        "command": "guanqi-toolkit.refresh",
         "title": "刷新",
         "icon": "$(refresh)"
       },
       {
-        "command": "catalog-annotations.newFile",
+        "command": "guanqi-toolkit.newFile",
         "title": "新建文件",
         "icon": "$(new-file)"
       },
       {
-        "command": "catalog-annotations.newFolder",
+        "command": "guanqi-toolkit.newFolder",
         "title": "新建文件夹",
         "icon": "$(new-folder)"
       },
       {
-        "command": "catalog-annotations.collapseAll",
-        "title": "全部折叠",
-        "icon": "$(collapse-all)"
-      },
-      {
-        "command": "catalog-annotations.revealInFinder",
+        "command": "guanqi-toolkit.revealInFinder",
         "title": "在 Finder 中显示",
         "icon": "$(folder-opened)"
       },
       {
-        "command": "catalog-annotations.openInIntegratedTerminal",
+        "command": "guanqi-toolkit.openInIntegratedTerminal",
         "title": "在集成终端中打开",
         "icon": "$(terminal)"
       },
       {
-        "command": "catalog-annotations.findInFolder",
+        "command": "guanqi-toolkit.findInFolder",
         "title": "在文件夹中查找...",
         "icon": "$(search)"
       },
       {
-        "command": "catalog-annotations.copyPath",
+        "command": "guanqi-toolkit.copyPath",
         "title": "复制路径"
       },
       {
-        "command": "catalog-annotations.copyRelativePath",
+        "command": "guanqi-toolkit.copyRelativePath",
         "title": "复制相对路径"
       },
       {
-        "command": "catalog-annotations.rename",
+        "command": "guanqi-toolkit.rename",
         "title": "重命名...",
         "icon": "$(edit)"
       },
       {
-        "command": "catalog-annotations.delete",
+        "command": "guanqi-toolkit.delete",
         "title": "删除",
         "icon": "$(trash)"
       },
       {
-        "command": "catalog-annotations.cut",
+        "command": "guanqi-toolkit.cut",
         "title": "剪切",
         "icon": "$(cut)"
       },
       {
-        "command": "catalog-annotations.copy",
+        "command": "guanqi-toolkit.copy",
         "title": "复制",
         "icon": "$(copy)"
       },
       {
-        "command": "catalog-annotations.paste",
+        "command": "guanqi-toolkit.paste",
         "title": "粘贴",
         "icon": "$(paste)"
       },
       {
-        "command": "catalog-annotations.projectHeader.newFile",
+        "command": "guanqi-toolkit.projectHeader.newFile",
         "title": "新建文件",
         "icon": "$(new-file)"
       },
       {
-        "command": "catalog-annotations.projectHeader.newFolder",
+        "command": "guanqi-toolkit.projectHeader.newFolder",
         "title": "新建文件夹",
         "icon": "$(new-folder)"
       },
       {
-        "command": "catalog-annotations.projectHeader.refresh",
+        "command": "guanqi-toolkit.projectHeader.refresh",
         "title": "刷新",
         "icon": "$(refresh)"
       }
@@ -125,84 +120,84 @@
     "viewsWelcome": [
       {
         "view": "directoryExplorer",
-        "contents": "没有找到目录配置文件。\n[初始化配置](command:catalog-annotations.initConfig)"
+        "contents": "没有找到目录配置文件。\n[初始化配置](command:guanqi-toolkit.initConfig)"
       }
     ],
     "menus": {
       "view/title": [],
       "view/item/context": [
         {
-          "command": "catalog-annotations.projectHeader.newFile",
+          "command": "guanqi-toolkit.projectHeader.newFile",
           "when": "view == directoryExplorer && viewItem == project-header",
           "group": "inline"
         },
         {
-          "command": "catalog-annotations.projectHeader.newFolder",
+          "command": "guanqi-toolkit.projectHeader.newFolder",
           "when": "view == directoryExplorer && viewItem == project-header",
           "group": "inline"
         },
         {
-          "command": "catalog-annotations.projectHeader.refresh",
+          "command": "guanqi-toolkit.projectHeader.refresh",
           "when": "view == directoryExplorer && viewItem == project-header",
           "group": "inline"
         },
         {
-          "command": "catalog-annotations.newFile",
+          "command": "guanqi-toolkit.newFile",
           "when": "view == directoryExplorer && viewItem == directory",
           "group": "1_modification"
         },
         {
-          "command": "catalog-annotations.newFolder",
+          "command": "guanqi-toolkit.newFolder",
           "when": "view == directoryExplorer && viewItem == directory",
           "group": "1_modification"
         },
         {
-          "command": "catalog-annotations.rename",
+          "command": "guanqi-toolkit.rename",
           "when": "view == directoryExplorer",
           "group": "2_modification"
         },
         {
-          "command": "catalog-annotations.delete",
+          "command": "guanqi-toolkit.delete",
           "when": "view == directoryExplorer",
           "group": "2_modification"
         },
         {
-          "command": "catalog-annotations.findInFolder",
+          "command": "guanqi-toolkit.findInFolder",
           "when": "view == directoryExplorer && viewItem == directory",
           "group": "3_search"
         },
         {
-          "command": "catalog-annotations.revealInFinder",
+          "command": "guanqi-toolkit.revealInFinder",
           "when": "view == directoryExplorer",
           "group": "4_navigation"
         },
         {
-          "command": "catalog-annotations.openInIntegratedTerminal",
+          "command": "guanqi-toolkit.openInIntegratedTerminal",
           "when": "view == directoryExplorer && viewItem == directory",
           "group": "4_navigation"
         },
         {
-          "command": "catalog-annotations.copyPath",
+          "command": "guanqi-toolkit.copyPath",
           "when": "view == directoryExplorer",
           "group": "5_cutcopypaste"
         },
         {
-          "command": "catalog-annotations.copyRelativePath",
+          "command": "guanqi-toolkit.copyRelativePath",
           "when": "view == directoryExplorer",
           "group": "5_cutcopypaste"
         },
         {
-          "command": "catalog-annotations.cut",
+          "command": "guanqi-toolkit.cut",
           "when": "view == directoryExplorer",
           "group": "5_cutcopypaste@1"
         },
         {
-          "command": "catalog-annotations.copy",
+          "command": "guanqi-toolkit.copy",
           "when": "view == directoryExplorer",
           "group": "5_cutcopypaste@2"
         },
         {
-          "command": "catalog-annotations.paste",
+          "command": "guanqi-toolkit.paste",
           "when": "view == directoryExplorer && viewItem == directory",
           "group": "5_cutcopypaste@3"
         }
@@ -215,14 +210,14 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.95.0",
+    "@types/vscode": "^1.74.0",
     "@types/mocha": "^10.0.9",
     "@types/node": "20.x",
     "eslint": "^9.13.0",
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.4.1"
   },
-  "publisher": "GQ",
+  "publisher": "Hook",
   "repository": {
     "type": "git",
     "url": "https://github.com/GQ-Y/guanqi-toolkit.git"
