@@ -2,7 +2,7 @@
   "name": "guanqi-toolkit",
   "displayName": "观企工具箱",
   "description": "观企科技 VS Code 工具箱，提供目录结构管理、注释显示等功能，支持 uniapp 项目的页面标题显示",
-  "version": "0.0.4",
+  "version": "1.0.0",
   "engines": {
     "vscode": "^1.74.0"
   },
