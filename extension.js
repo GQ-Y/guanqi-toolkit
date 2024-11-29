@@ -289,10 +289,50 @@ async function activate(context) {
                 let lastVersion = '';
                 if (fs.existsSync(versionFile)) {
                     try {
-                        const versionInfo = JSON.parse(fs.readFileSync(versionFile, 'utf8'));
+                        const versionContent = fs.readFileSync(versionFile, 'utf8');
+                        
+                        // 验证JSON内容是否为空
+                        if (!versionContent.trim()) {
+                            throw new Error('version.json文件为空');
+                        }
+
+                        // 尝试解析JSON
+                        const versionInfo = JSON.parse(versionContent);
+                        
+                        // 验证必要字段
+                        if (!versionInfo || typeof versionInfo !== 'object') {
+                            throw new Error('version.json格式无效');
+                        }
+
                         lastVersion = versionInfo.lastVersion;
+                        
+                        // 如果没有buildHistory字段,初始化它
+                        if (!Array.isArray(versionInfo.buildHistory)) {
+                            versionInfo.buildHistory = [];
+                            // 重写文件以修复结构
+                            fs.writeFileSync(versionFile, JSON.stringify(versionInfo, null, 2));
+                        }
+
                     } catch (error) {
                         console.error('读取版本信息失败:', error);
+                        logBuildInfo(`版本文件读取错误: ${error.message}`);
+                        
+                        // 如果文件损坏,创建新的版本文件
+                        const initialVersionInfo = {
+                            lastVersion: '',
+                            lastBuildTime: '',
+                            imageInfo: {},
+                            buildHistory: []
+                        };
+                        
+                        try {
+                            fs.writeFileSync(versionFile, JSON.stringify(initialVersionInfo, null, 2));
+                            logBuildInfo('已重新初始化版本文件');
+                            vscode.window.showInformationMessage('版本文件已重新初始化');
+                        } catch (writeError) {
+                            logBuildInfo(`重新初始化版本文件失败: ${writeError.message}`);
+                            throw new Error(`无法创建或修复版本文件: ${writeError.message}`);
+                        }
                     }
                 }
                 
@@ -308,26 +348,47 @@ async function activate(context) {
                 const fullImageTag = `${config.registry.url}/${config.registry.namespace}/${config.registry.repository}:${version}`;
                 const pullCommand = `docker pull ${fullImageTag}`;
                 
-                fs.writeFileSync(versionFile, JSON.stringify({
-                    lastVersion: version,
-                    lastBuildTime: new Date().toISOString(),
-                    imageInfo: {
-                        repository: config.registry.repository,
-                        fullTag: fullImageTag,
-                        pullCommand: pullCommand
-                    },
-                    buildHistory: [
-                        {
-                            version: version,
-                            buildTime: new Date().toISOString(),
-                            imageTag: fullImageTag,
+                try {
+                    const newVersionInfo = {
+                        lastVersion: version,
+                        lastBuildTime: new Date().toISOString(),
+                        imageInfo: {
+                            repository: config.registry.repository,
+                            fullTag: fullImageTag,
                             pullCommand: pullCommand
+                        },
+                        buildHistory: [
+                            {
+                                version: version,
+                                buildTime: new Date().toISOString(),
+                                imageTag: fullImageTag,
+                                pullCommand: pullCommand
+                            }
+                        ]
+                    };
+
+                    // 如果存在旧的构建历史,则合并
+                    if (fs.existsSync(versionFile)) {
+                        try {
+                            const oldInfo = JSON.parse(fs.readFileSync(versionFile, 'utf8'));
+                            if (Array.isArray(oldInfo.buildHistory)) {
+                                newVersionInfo.buildHistory = newVersionInfo.buildHistory.concat(
+                                    oldInfo.buildHistory
+                                ).slice(0, 10);
+                            }
+                        } catch (error) {
+                            logBuildInfo(`读取旧构建历史失败: ${error.message}`);
                         }
-                    ].concat(fs.existsSync(versionFile) 
-                        ? JSON.parse(fs.readFileSync(versionFile, 'utf8')).buildHistory || []
-                        : []
-                    ).slice(0, 10) // 只保留最近10条记录
-                }, null, 2));
+                    }
+
+                    // 写入新版本信息
+                    fs.writeFileSync(versionFile, JSON.stringify(newVersionInfo, null, 2));
+                    logBuildInfo('版本信息已更新');
+
+                } catch (error) {
+                    logBuildInfo(`保存版本信息失败: ${error.message}`);
+                    throw new Error(`无法保存版本信息: ${error.message}`);
+                }
 
                 // 在日志中记录完整信息
                 logBuildInfo('版本信息:');
