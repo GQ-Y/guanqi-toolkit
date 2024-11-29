@@ -22,4 +22,6 @@
 2. 点击图标打开目录树视图
 3. 右键点击目录可以进行各种操作
 4. 编辑 directory-config.json 文件可以添加目录注释
+5. 编辑 version.json 文件可以查看版本信息
+6. vsce package 可打包扩展
 
