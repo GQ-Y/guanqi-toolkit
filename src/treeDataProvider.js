@@ -25,6 +25,7 @@ class DirectoryTreeProvider {
         
         // 设置文件系统监听器
         this._setupFileWatcher();
+        this._initialized = false;
     }
 
     _setupFileWatcher() {
@@ -76,6 +77,9 @@ class DirectoryTreeProvider {
         console.log('开始加载配置');
 
         try {
+            // 添加小延迟，确保配置文件已完全写入
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
             // 重新加载 uniapp 页面配置
             this.pageMap = await readUniappPages(this.workspaceRoot);
 
@@ -103,6 +107,11 @@ class DirectoryTreeProvider {
                     updateCommentMap(config.directories);
                 }
                 console.log('已更新注释映射:', this.commentMap);
+                
+                // 配置加载完成后，再次触发刷新
+                setTimeout(() => {
+                    this._onDidChangeTreeData.fire();
+                }, 100);
             }
         } catch (error) {
             console.error('加载配置失败:', error);
@@ -129,8 +138,13 @@ class DirectoryTreeProvider {
         console.log('开始刷新目录树');
 
         try {
+            // 添加延迟加载
+            await new Promise(resolve => setTimeout(resolve, 100));
             await this.loadConfig();
-            this._onDidChangeTreeData.fire();
+            // 确保配置完全加载后再刷新
+            setTimeout(() => {
+                this._onDidChangeTreeData.fire();
+            }, 100);
             this.lastRefreshTime = now;
         } catch (error) {
             console.error('刷新过程中发生错误:', error);
@@ -150,7 +164,12 @@ class DirectoryTreeProvider {
             // 清除缓存
             this.commentMap.clear();
             this.pageMap = null;
+            this._initialized = false;  // 重置初始化状态
+            this._config = null;        // 清除配置缓存
 
+            // 重新初始化
+            await this.initialize();
+            
             // 立即执行刷新
             await this.loadConfig();
             this._onDidChangeTreeData.fire();
@@ -159,6 +178,7 @@ class DirectoryTreeProvider {
             console.log('强制刷新完成');
         } catch (error) {
             console.error('强制刷新过程中发生错误:', error);
+            throw error;  // 向上传递错误
         }
     }
 
@@ -532,6 +552,44 @@ class DirectoryTreeProvider {
         tooltipContent.supportHtml = true;
         tooltipContent.isTrusted = true;
         return tooltipContent;
+    }
+
+    async initialize() {
+        if (this._initialized) return;
+        
+        try {
+            // 确保配置已加载
+            const configPath = path.join(this.workspaceRoot, 'directory-config.json');
+            if (fs.existsSync(configPath)) {
+                const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+                this._config = config;
+            }
+            
+            // 预加载所有目录注释
+            await this._preloadComments();
+            
+            this._initialized = true;
+        } catch (error) {
+            console.error('TreeDataProvider initialization error:', error);
+            throw error;
+        }
+    }
+
+    async _preloadComments() {
+        // 预加载所有目录的注释
+        const configPath = path.join(this.workspaceRoot, 'directory-config.json');
+        if (fs.existsSync(configPath)) {
+            const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+            if (config.directories) {
+                for (const dir of config.directories) {
+                    if (dir.comment) {
+                        // 缓存注释
+                        this._comments = this._comments || new Map();
+                        this._comments.set(dir.path, dir.comment);
+                    }
+                }
+            }
+        }
     }
 }
 

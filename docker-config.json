@@ -1,0 +1,12 @@
+{
+  "registry": {
+    "url": "registry.cn-hangzhou.aliyuncs.com",
+    "namespace": "hook-docker",
+    "repository": "gq-yl",
+    "username": "yl-hook"
+  },
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "."
+  }
+} 

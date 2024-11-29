@@ -2,7 +2,7 @@
   "name": "guanqi-toolkit",
   "displayName": "观企工具箱",
   "description": "观企科技 VS Code 工具箱，提供目录结构管理、注释显示等功能，支持 uniapp 项目的页面标题显示",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -22,6 +22,11 @@
       {
         "command": "guanqi-toolkit.refresh",
         "title": "刷新",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "guanqi-toolkit.forceRefreshTree",
+        "title": "刷新目录树视图",
         "icon": "$(refresh)"
       },
       {
@@ -96,6 +101,11 @@
         "command": "guanqi-toolkit.openGithub",
         "title": "访问 GitHub",
         "icon": "$(github)"
+      },
+      {
+        "command": "extension.dockerBuild",
+        "title": "Docker: 构建并发布镜像",
+        "icon": "$(activate-breakpoints)"
       }
     ],
     "viewsContainers": {
@@ -141,17 +151,27 @@
           "group": "navigation@3"
         },
         {
+          "command": "extension.dockerBuild",
+          "when": "view == directoryExplorer && guanqi-toolkit:hasDockerDir",
+          "group": "navigation@4"
+        },
+        {
           "command": "guanqi-toolkit.openSettings",
           "when": "view == directoryExplorer",
-          "group": "navigation@4"
+          "group": "navigation@5"
         },
         {
           "command": "guanqi-toolkit.openGithub",
           "when": "view == directoryExplorer",
-          "group": "navigation@5"
+          "group": "navigation@6"
         }
       ],
       "view/item/context": [
+        {
+          "command": "guanqi-toolkit.forceRefreshTree",
+          "when": "view == directoryExplorer",
+          "group": "1_modification@0"
+        },
         {
           "command": "guanqi-toolkit.newFile",
           "when": "view == directoryExplorer && viewItem == directory",
@@ -327,6 +347,42 @@
               "readOnly": true
             }
           }
+        },
+        "guanqi-toolkit.docker.registry.url": {
+          "type": "string",
+          "default": "registry.cn-hangzhou.aliyuncs.com",
+          "description": "Docker Registry地址"
+        },
+        "guanqi-toolkit.docker.registry.namespace": {
+          "type": "string",
+          "default": "",
+          "description": "Docker Registry命名空间"
+        },
+        "guanqi-toolkit.docker.registry.repository": {
+          "type": "string",
+          "default": "",
+          "description": "Docker仓库名称"
+        },
+        "guanqi-toolkit.docker.registry.username": {
+          "type": "string",
+          "default": "",
+          "description": "Docker Registry登录用户名"
+        },
+        "guanqi-toolkit.docker.registry.password": {
+          "type": "string",
+          "default": "",
+          "description": "Docker Registry登录密码",
+          "scope": "machine"
+        },
+        "guanqi-toolkit.docker.build.dockerfile": {
+          "type": "string",
+          "default": "Dockerfile",
+          "description": "Dockerfile路径"
+        },
+        "guanqi-toolkit.docker.build.context": {
+          "type": "string",
+          "default": ".",
+          "description": "Docker构建上下文路径"
         }
       }
     }

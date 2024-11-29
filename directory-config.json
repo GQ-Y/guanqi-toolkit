@@ -1,0 +1,26 @@
+{
+  "version": "1.0",
+  "directories": [
+    {
+      "path": "images",
+      "comment": "",
+      "children": []
+    },
+    {
+      "path": "src",
+      "comment": "",
+      "children": [
+        {
+          "path": "src/ai",
+          "comment": "",
+          "children": []
+        }
+      ]
+    },
+    {
+      "path": "test",
+      "comment": "",
+      "children": []
+    }
+  ]
+}
